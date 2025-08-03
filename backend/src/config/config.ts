@@ -34,7 +34,7 @@ const config = {
     clientId: process.env.GOOGLE_DRIVE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_DRIVE_CLIENT_SECRET || '',
   },
-  frontendBaseUrl: process.env.FRONTEND_BASE_URL || 'http://localhost:5173',
+  frontendBaseUrl: process.env.FRONTEND_BASE_URL || 'http://localhost:3000',
   uploadDir: process.env.UPLOAD_DIR || path.join(__dirname, '../../uploads'),
 };
 

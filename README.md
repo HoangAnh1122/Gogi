@@ -49,7 +49,7 @@ Hệ thống quản lý ảnh thông minh tích hợp AI nhận diện khuôn m�
 ## 📂 Cấu Trúc Project
 
 ```
-Gbot/
+Gogi/
 ├── frontend/              # Vue.js Frontend
 ├── backend/               # Node.js Express API
 │   ├── src/               # TypeScript source code
@@ -84,7 +84,7 @@ Gbot/
 ### 2. Cài Đặt & Chạy Backend API
 ```bash
 # Di chuyển vào thư mục backend
-cd Gogi/backend
+cd backend
 
 # Cài đặt dependencies
 npm install
@@ -108,7 +108,7 @@ Backend API sẽ chạy tại: **http://localhost:5000**
 ### 3. Cài Đặt & Chạy Frontend
 ```bash
 # Di chuyển vào thư mục frontend
-cd Gogi/frontend
+cd frontend
 
 # Cài đặt dependencies
 npm install
@@ -126,15 +126,35 @@ Frontend sẽ chạy tại: **http://localhost:3000**
 
 #### Windows
 ```bash
+# Cài đặt n8n globally
+npm install -g n8n
+
+# Chạy n8n
+n8n start
+```
+
+#### macOS/Linux
+```bash
+# Cài đặt n8n globally
+npm install -g n8n
+
+# Chạy n8n
+n8n start
+```
+
+n8n Workflow Engine sẽ chạy tại: **http://localhost:5678**
+
+### 5. Cài Đặt Python Environment cho DeepFace
+
+#### Windows
+```bash
 # Tạo và kích hoạt môi trường ảo Python
 python -m venv .venv
 .venv\Scripts\activate
 
-# Cài đặt n8n
-pip install n8n
-
-# Chạy n8n
-n8n start
+# Cài đặt dependencies Python
+cd backend
+pip install -r scripts/python/requirements.txt
 ```
 
 #### macOS/Linux
@@ -143,16 +163,17 @@ n8n start
 python -m venv .venv
 source .venv/bin/activate
 
-# Cài đặt n8n
-pip install n8n
-
-# Chạy n8n
-n8n start
+# Cài đặt dependencies Python
+cd backend
+pip install -r scripts/python/requirements.txt
 ```
 
-n8n Workflow Engine sẽ chạy tại: **http://localhost:5678**
+**Lưu ý**: Nếu gặp lỗi với DeepFace, hãy thử cài đặt phiên bản minimal:
+```bash
+pip install -r scripts/python/requirements-minimal.txt
+```
 
-### 5. Cấu Hình n8n Workflows
+### 6. Cấu Hình n8n Workflows
 1. Truy cập n8n tại http://localhost:5678
 2. Đăng nhập với tài khoản mặc định (email: admin@example.com, password: password)
 3. Import các workflow từ thư mục `n8n-workflows`:
@@ -161,10 +182,10 @@ n8n Workflow Engine sẽ chạy tại: **http://localhost:5678**
    - Lặp lại cho các thư mục workflow khác
 4. Kích hoạt các workflow cần thiết
 
-### 6. Truy Cập Hệ Thống
+### 7. Truy Cập Hệ Thống
 - **Frontend**: http://localhost:3000
-  - **Admin**: `admin` / `admin123`
-  - **User**: `user` / `user123`
+  - **Admin**: `admin@example.com` / `admin123`
+  - **User**: `user@example.com` / `user123`
 - **Backend API**: http://localhost:5000
 - **n8n Workflow Engine**: http://localhost:5678
 
@@ -251,19 +272,55 @@ pm2 start "n8n start" --name "n8n"
 3. Để sử dụng chatbot webhooks trong môi trường development, bạn cần sử dụng ngrok hoặc một dịch vụ tương tự để tạo public URL
 
 ## 🔍 Troubleshooting
-- **MongoDB Connection Error**: Kiểm tra MongoDB đang chạy và URI kết nối đúng
-- **n8n Workflow Execution Error**: Kiểm tra logs trong n8n UI và đảm bảo các credentials đã được cấu hình
-- **API Connection Error**: Kiểm tra CORS settings và đảm bảo Backend API đang chạy
+
+### Lỗi Phổ Biến và Cách Khắc Phục:
+
+**1. MongoDB Connection Error:**
+- Kiểm tra MongoDB đang chạy: `mongod --version`
+- Kiểm tra URI kết nối trong file `.env`
+- Đảm bảo port 27017 không bị chiếm bởi ứng dụng khác
+
+**2. Frontend không kết nối được Backend:**
+- Kiểm tra Backend đang chạy tại port 5000
+- Kiểm tra CORS settings trong backend/src/index.ts
+- Đảm bảo VITE_API_BASE_URL đúng trong frontend/.env
+
+**3. n8n Workflow Execution Error:**
+- Kiểm tra logs trong n8n UI
+- Đảm bảo các credentials đã được cấu hình đúng
+- Kiểm tra n8n có quyền truy cập các API external
+
+**4. DeepFace/Python Environment Error:**
+- Kích hoạt virtual environment: `source .venv/bin/activate` (Linux/Mac) hoặc `.venv\Scripts\activate` (Windows)
+- Cài đặt lại dependencies: `pip install -r backend/scripts/python/requirements-minimal.txt`
+- Kiểm tra Python version: `python --version` (nên >= 3.8)
+
+**5. Google Drive API Error:**
+- Kiểm tra credentials Google Drive đã được setup đúng
+- Đảm bảo OAuth 2.0 redirect URI đã được thêm: `http://localhost:5000/api/drive/oauth2callback`
+- Kiểm tra Google Drive API đã được enable trong Google Cloud Console
+
+**6. Port Already in Use:**
+```bash
+# Kiểm tra process đang sử dụng port
+netstat -ano | findstr :5000  # Windows
+lsof -i :5000                 # Mac/Linux
+
+# Kill process nếu cần
+taskkill /PID <process_id> /F  # Windows
+kill -9 <process_id>           # Mac/Linux
+```
 
 ---
 
-**Next Steps**: 
-1. ✅ ~~Frontend hoàn thành~~
-2. ✅ ~~n8n Backend workflows hoàn thành~~
-3. ✅ ~~API Integration hoàn thành~~
-4. 🔄 **Deploy to production**
-5. 🔄 **User testing and feedback** 
+**Latest Updates**: 
+1. ✅ **Frontend hoàn thành** - Chạy trên port 3000
+2. ✅ **n8n Backend workflows hoàn thành**
+3. ✅ **API Integration hoàn thành**
+4. ✅ **Documentation cập nhật** - README.md đầy đủ cho từng module
+5. 🔄 **Deploy to production**
+6. 🔄 **User testing and feedback** 
 
-
-admin / admin123 (role: admin)
-user / user123 (role: user)
+**Tài Khoản Mặc Định**:
+- **Admin**: `admin@example.com` / `admin123` (role: admin)
+- **User**: `user@example.com` / `user123` (role: user)

@@ -1,6 +1,6 @@
 <template>
   <el-container class="app-layout">
-    <!-- Sidebar -->
+    <!-- Sidebar - Always collapsed by default -->
     <el-aside class="sidebar" :width="isCollapse ? '64px' : '220px'">
       <div class="logo-container">
         <h2 class="logo">📸</h2>
@@ -97,7 +97,8 @@ import { Fold, Expand, House, Picture, ChatLineRound, Bell, User, Setting, Switc
 const router = useRouter()
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
-const isCollapse = ref(false)
+// Sidebar is collapsed by default for better UX
+const isCollapse = ref(true)
 
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
@@ -156,6 +157,7 @@ const handleCommand = async (command: string) => {
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
 }
 
 .logo-container {
@@ -166,6 +168,7 @@ const handleCommand = async (command: string) => {
   gap: 12px;
   padding: 0 10px;
   flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .logo {
@@ -194,15 +197,20 @@ const handleCommand = async (command: string) => {
 .sidebar-menu .el-menu-item {
   color: var(--sidebar-text-color);
   font-weight: 500;
+  margin: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
 }
 
 .sidebar-menu .el-menu-item:hover {
   background-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(4px);
 }
 
 .sidebar-menu .el-menu-item.is-active {
   background-color: var(--primary-color) !important;
   color: var(--sidebar-active-color) !important;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
 }
 
 /* Main Container Styles */
@@ -210,12 +218,13 @@ const handleCommand = async (command: string) => {
   display: flex;
   flex-direction: column;
   transition: margin-left 0.3s ease;
+  background-color: #f8f9fa;
 }
 
 /* Header Styles */
 .header {
   background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -224,6 +233,7 @@ const handleCommand = async (command: string) => {
   position: sticky;
   top: 0;
   z-index: 10;
+  border-bottom: 1px solid #e8eaed;
 }
 
 .header-left, .header-right {
@@ -236,6 +246,15 @@ const handleCommand = async (command: string) => {
   font-size: 22px;
   cursor: pointer;
   color: #333;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.collapse-btn:hover {
+  background-color: #f5f7fa;
+  color: var(--primary-color);
+  transform: scale(1.05);
 }
 
 /* Right side of header */
@@ -244,13 +263,14 @@ const handleCommand = async (command: string) => {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
-  transition: all 0.3s;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
 }
 
 .user-dropdown:hover {
   background-color: #f5f7fa;
+  transform: translateY(-1px);
 }
 
 .username {
@@ -261,23 +281,29 @@ const handleCommand = async (command: string) => {
 .user-avatar {
   background: var(--primary-color);
   color: #fff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
 }
 
 .notification-badge {
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+  padding: 8px;
+  border-radius: 6px;
 }
 
 .notification-badge:hover {
   color: var(--primary-color);
+  background-color: #f5f7fa;
+  transform: scale(1.1);
 }
 
 /* Main Content Styles */
 .main-content {
-  padding: 24px;
+  padding: 20px;
   flex: 1;
   overflow-y: auto;
   position: relative;
+  background-color: #f8f9fa;
 }
 
 /* Transitions */
@@ -318,5 +344,46 @@ const handleCommand = async (command: string) => {
   .username {
     display: none;
   }
+  
+  .main-content {
+    padding: 16px;
+  }
+  
+  .header {
+    padding: 0 16px;
+  }
+}
+
+/* Enhanced hover effects for better UX */
+.sidebar-menu .el-menu-item .el-icon {
+  transition: all 0.3s ease;
+}
+
+.sidebar-menu .el-menu-item:hover .el-icon {
+  transform: scale(1.1);
+}
+
+/* Smooth transitions for all interactive elements */
+* {
+  transition: all 0.2s ease;
+}
+
+/* Custom scrollbar for main content */
+.main-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.main-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.main-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.main-content::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 </style> 

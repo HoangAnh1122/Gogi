@@ -52,16 +52,6 @@
           <h1>AI Photo Assistant</h1>
           <p class="header-subtitle">Your intelligent photo management companion</p>
         </div>
-        <div class="header-actions">
-          <el-button size="default" @click="showPhotoComparisonDialog" type="success" plain>
-            <el-icon><CameraFilled /></el-icon>
-            Compare Photos
-          </el-button>
-          <el-button size="default" @click="showImageUpload" type="primary" plain>
-            <el-icon><Upload /></el-icon>
-            Analyze Images
-          </el-button>
-        </div>
       </div>
       
       <el-card class="chat-card animate-card">
@@ -392,258 +382,6 @@
       </template>
     </el-dialog>
     
-    <!-- Image Upload Dialog -->
-    <el-dialog
-      v-model="imageUploadVisible"
-      title="Upload Images for Analysis"
-      width="700px"
-      destroy-on-close
-      top="10vh"
-      class="upload-dialog"
-    >
-      <div class="dialog-content">
-        <div class="upload-instruction">
-          <el-icon :size="40" class="instruction-icon"><PictureRounded /></el-icon>
-          <div class="instruction-text">
-            <h3>Upload photos for AI analysis</h3>
-            <p>Our AI will analyze facial features, image quality, and other parameters to help you select the best photos. You can upload up to 20 images at once.</p>
-          </div>
-        </div>
-        
-        <el-upload
-          class="image-uploader"
-          :action="uploadActionUrl"
-          name="images"
-          :headers="authHeaders"
-          :on-success="handleImageUploadSuccess"
-          :on-error="handleImageUploadError"
-          :before-upload="beforeImageUpload"
-          :limit="20"
-          :auto-upload="true"
-          accept="image/*"
-          multiple
-          drag
-        >
-          <div class="upload-content">
-            <el-icon class="el-icon--upload" :size="40"><upload-filled /></el-icon>
-            <div class="el-upload__text">Drop images here or <em>click to upload</em></div>
-          </div>
-          <template #tip>
-            <div class="el-upload__tip">
-              <el-alert
-                title="File requirements"
-                type="info"
-                :closable="false"
-                show-icon
-              >
-                <ul class="upload-requirements">
-                  <li>JPG, PNG, WebP, or GIF format</li>
-                  <li>Maximum file size: 1GB per image</li>
-                  <li>Up to 20 images can be uploaded at once</li>
-                  <li>Good lighting recommended for best results</li>
-                </ul>
-              </el-alert>
-            </div>
-          </template>
-        </el-upload>
-        
-        <div class="upload-preview" v-if="analysisImageIds.length > 0">
-          <div class="preview-badge">
-            <el-badge :value="`${analysisImageIds.length} Uploaded`" type="success">
-              <el-icon :size="24"><Check /></el-icon>
-            </el-badge>
-          </div>
-        </div>
-      </div>
-      
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="imageUploadVisible = false" plain>Cancel</el-button>
-          <el-button 
-            type="primary" 
-            :disabled="!analysisImageIds.length" 
-            @click="analyzeUploadedImage"
-            :loading="analyzing"
-          >
-            <el-icon><Crop /></el-icon>
-            Analyze Images
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
-    
-    <!-- Photo Comparison Dialog -->
-    <el-dialog
-      v-model="photoComparisonVisible"
-      title="Compare and Select Best Photos"
-      width="800px"
-      destroy-on-close
-      top="5vh"
-      class="comparison-dialog"
-    >
-      <div class="dialog-content">
-        <div class="comparison-header">
-          <el-steps :active="comparisonStep" finish-status="success" simple>
-            <el-step title="Customer Info" icon="User" />
-            <el-step title="Choose Source" icon="FolderOpened" />
-            <el-step title="Select Photos" icon="PictureFilled" />
-          </el-steps>
-        </div>
-        
-        <el-form :model="comparisonForm" label-position="top" class="comparison-form">
-          <!-- Step 1: Customer Info -->
-          <div v-if="comparisonStep === 1" class="comparison-step">
-            <div class="step-header">
-              <h3>Enter Customer Information</h3>
-              <p>This name will be used to create a custom folder for selected photos</p>
-            </div>
-            
-            <el-form-item label="Customer Name" required>
-              <el-input 
-                v-model="comparisonForm.customerName" 
-                placeholder="Enter customer name"
-                prefix-icon="User"
-                clearable
-              ></el-input>
-            </el-form-item>
-            
-            <el-form-item label="Additional Notes (Optional)">
-              <el-input 
-                v-model="comparisonForm.notes" 
-                type="textarea" 
-                placeholder="Add any special instructions or notes about this customer"
-                :rows="3"
-              ></el-input>
-            </el-form-item>
-          </div>
-          
-          <!-- Step 2: Choose Source -->
-          <div v-if="comparisonStep === 2" class="comparison-step">
-            <div class="step-header">
-              <h3>Select Photo Source</h3>
-              <p>Choose where to get photos for comparison</p>
-            </div>
-            
-            <div class="source-options">
-              <div 
-                class="source-option" 
-                :class="{ active: comparisonForm.source === 'drive' }"
-                @click="comparisonForm.source = 'drive'"
-              >
-                <el-icon :size="40"><Folder /></el-icon>
-                <div class="option-title">Google Drive</div>
-                <div class="option-description">Process photos from your connected Google Drive account</div>
-                <el-radio v-model="comparisonForm.source" label="drive"></el-radio>
-              </div>
-              
-              <div 
-                class="source-option"
-                :class="{ active: comparisonForm.source === 'upload' }"
-                @click="comparisonForm.source = 'upload'"
-              >
-                <el-icon :size="40"><Upload /></el-icon>
-                <div class="option-title">Upload Photos</div>
-                <div class="option-description">Upload new photos from your device for processing</div>
-                <el-radio v-model="comparisonForm.source" label="upload"></el-radio>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Step 3: Select Photos -->
-          <div v-if="comparisonStep === 3" class="comparison-step">
-            <div class="step-header">
-              <h3>{{ comparisonForm.source === 'drive' ? 'Google Drive Photos' : 'Upload Photos' }}</h3>
-              <p>{{ comparisonForm.source === 'drive' ? 'All photos from your connected Google Drive will be processed' : 'Upload up to 50 photos for comparison' }}</p>
-            </div>
-            
-            <template v-if="comparisonForm.source === 'drive'">
-              <el-alert
-                title="All photos from your connected Google Drive will be processed"
-                type="info"
-                :closable="false"
-                class="mb-3"
-                show-icon
-              >
-                <p>The AI will analyze all photos in your Drive account and select the best ones based on quality and face detection.</p>
-              </el-alert>
-              
-              <div class="drive-status">
-                <el-icon :size="40"><Connection /></el-icon>
-                <div class="drive-status-text">
-                  <div class="status-title">Google Drive Connected</div>
-                  <div class="status-description">Ready to process photos</div>
-                </div>
-              </div>
-            </template>
-            
-            <template v-else>
-              <el-upload
-                class="photo-comparison-uploader"
-                :action="uploadActionUrl"
-                name="images"
-                :headers="authHeaders"
-                :on-success="handleComparisonUploadSuccess"
-                :on-error="handleImageUploadError"
-                :before-upload="beforeImageUpload"
-                :limit="50"
-                :auto-upload="true"
-                accept="image/*"
-                multiple
-                list-type="picture-card"
-              >
-                <el-icon><Plus /></el-icon>
-              </el-upload>
-              
-              <div class="upload-counter" v-if="uploadedImageIds.length > 0">
-                <el-progress 
-                  type="circle" 
-                  :percentage="Math.min(100, uploadedImageIds.length * 2)" 
-                  :width="80"
-                  :stroke-width="10"
-                  :format="() => `${uploadedImageIds.length}/50`"
-                ></el-progress>
-                <div class="counter-text">
-                  <span>{{ uploadedImageIds.length }} {{ uploadedImageIds.length === 1 ? 'photo' : 'photos' }} uploaded</span>
-                </div>
-              </div>
-            </template>
-          </div>
-        </el-form>
-      </div>
-      
-      <template #footer>
-        <div class="dialog-footer">
-          <div class="footer-left">
-            <el-button @click="previousStep" v-if="comparisonStep > 1" plain>
-              <el-icon><ArrowLeft /></el-icon> Previous
-            </el-button>
-          </div>
-          
-          <div class="footer-right">
-            <el-button @click="photoComparisonVisible = false">Cancel</el-button>
-            <el-button 
-              v-if="comparisonStep < 3" 
-              type="primary" 
-              @click="nextStep" 
-              :disabled="comparisonStep === 1 && !comparisonForm.customerName.trim()"
-            >
-              Next <el-icon><ArrowRight /></el-icon>
-            </el-button>
-            <el-button 
-              v-else
-              type="success" 
-              :disabled="!canStartComparison" 
-              :loading="processingComparison"
-              @click="startPhotoComparison"
-            >
-              <el-icon><CameraFilled /></el-icon>
-              Start Comparison
-            </el-button>
-          </div>
-        </div>
-      </template>
-    </el-dialog>
-
     <!-- Conversation editing dialog -->
     <el-dialog
       v-model="editConversationDialog"
@@ -690,10 +428,9 @@ import { ref, computed, onMounted, nextTick, watch, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Refresh, Promotion, Picture, Star, InfoFilled, QuestionFilled, 
-  ChatLineRound, ChatLineSquare, Document, Folder, Upload, CameraFilled, 
-  Plus, UploadFilled, Check, User, ArrowLeft, ArrowRight, ArrowDown, PictureRounded,
-  FolderOpened, PictureFilled, Crop, Timer, Connection, Operation,
-  DataAnalysis, ChatDotSquare, Loading, ChatDotRound, Edit, Delete, MoreFilled,
+  ChatLineRound, ChatLineSquare, Document, Folder, Upload, 
+  Plus, User, ArrowDown, 
+  ChatDotSquare, Loading, ChatDotRound, Edit, Delete, MoreFilled,
   WarningFilled, Close, Avatar
 } from '@element-plus/icons-vue'
 import { chatbotApi, imageApi } from '@/services/api'
@@ -714,7 +451,6 @@ const processingComparison = ref(false)
 const analyzing = ref(false)
 const chatContainer = ref<HTMLElement>()
 const uploadedImageIds = ref<string[]>([])
-const analysisImageIds = ref<string[]>([])
 const attachedImages = ref<{ id: string; url: string }[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
 const uploadingAttachments = ref(false)
@@ -762,7 +498,6 @@ const startNewConversation = () => {
 }
 
 // UI state
-const comparisonStep = ref(1)
 const showScrollButton = ref(false)
 
 // Quick reply suggestions
@@ -771,14 +506,14 @@ const quickReplies = computed(() => {
   if (attachedImages.value.length > 0) {
     return [
       "Process these photos for customer",
-      "Compare with my Google Drive",
+      "Analyze these images",
       "Find similar faces",
       "Create photo album"
     ]
   } else {
     return [
       "Connect Google Drive",
-      "How to compare photos?", 
+      "How to use the assistant?", 
       "Show recent albums",
       "Help"
     ]
@@ -795,9 +530,9 @@ const messageTemplates = [
   },
   {
     id: '2',
-    title: 'Compare with Drive Photos',
-    content: 'Compare these photos with my Google Drive and find the best matches for customer [Customer Name]',
-    category: 'comparison'
+    title: 'Analyze Images',
+    content: 'Please analyze these images and provide detailed feedback',
+    category: 'analysis'
   },
   {
     id: '3',
@@ -826,38 +561,10 @@ const messageTemplates = [
   {
     id: '7',
     title: 'Help Request',
-    content: 'How do I use the photo comparison feature?',
+    content: 'How do I use the AI assistant?',
     category: 'help'
   }
 ]
-
-// Comparison form
-const comparisonForm = ref({
-  customerName: '',
-  source: 'drive' as 'drive' | 'upload',
-  notes: '',
-  maxPhotos: 5,
-  includeMetadata: true
-})
-
-const canStartComparison = computed(() => {
-  return comparisonForm.value.customerName.trim() && 
-    (comparisonForm.value.source === 'drive' || 
-     (comparisonForm.value.source === 'upload' && uploadedImageIds.value.length > 0));
-});
-
-// Enhanced methods
-const nextStep = () => {
-  if (comparisonStep.value < 3) {
-    comparisonStep.value++
-  }
-}
-
-const previousStep = () => {
-  if (comparisonStep.value > 1) {
-    comparisonStep.value--
-  }
-}
 
 const sendMessage = async () => {
   if (!newMessage.value.trim() && attachedImages.value.length === 0) return
@@ -1113,16 +820,11 @@ const showTemplatesModal = () => {
   templatesVisible.value = true
 }
 
-const showImageUpload = () => {
-  analysisImageIds.value = []
-  imageUploadVisible.value = true
-}
-
 const handleImageUploadSuccess = (response: any, file: any, fileList: any) => {
   const files = Array.isArray(response.data) ? response.data : [response.data]
   files.forEach((file: any) => {
     if (file && (file._id || file.id)) {
-      analysisImageIds.value.push(file._id || file.id)
+      uploadedImageIds.value.push(file._id || file.id)
     }
   })
   ElMessage({
@@ -1132,7 +834,7 @@ const handleImageUploadSuccess = (response: any, file: any, fileList: any) => {
   })
   
   // Clear the upload list after successful upload
-  if (fileList && fileList.length === analysisImageIds.value.length) {
+  if (fileList && fileList.length === uploadedImageIds.value.length) {
     nextTick(() => {
       const uploadRef = document.querySelector('.image-uploader .el-upload-list')
       if (uploadRef) {
@@ -1189,21 +891,21 @@ const beforeImageUpload = (rawFile: File) => {
 }
 
 const analyzeUploadedImage = async () => {
-  if (!analysisImageIds.value.length) return
+  if (!uploadedImageIds.value.length) return
   
   sending.value = true
   analyzing.value = true
   imageUploadVisible.value = false
   
   try {
-    const response = await chatbotApi.evaluateImages(analysisImageIds.value)
+    const response = await chatbotApi.evaluateImages(uploadedImageIds.value)
     
     const botResponse: ChatMessage = {
       _id: Date.now().toString(),
       conversationId: activeConversationId.value || 'temp',
       userId: 'bot',
       message: 'Image analysis',
-      response: sanitizeText(`Image evaluation started. This will take a moment to process ${analysisImageIds.value.length} image${analysisImageIds.value.length > 1 ? 's' : ''}. I'll find faces and assess the quality of the images using factors like lighting, focus, and composition.`),
+      response: sanitizeText(`Image evaluation started. This will take a moment to process ${uploadedImageIds.value.length} image${uploadedImageIds.value.length > 1 ? 's' : ''}. I'll find faces and assess the quality of more factors like lighting, focus, and composition.`),
       platform: 'web',
       type: 'text',
       createdAt: new Date().toISOString()
@@ -1577,25 +1279,69 @@ onUnmounted(() => {
   window.removeEventListener('resize', scrollToBottom);
 });
 
-// Markdown instance
+// Enhanced Markdown instance
 const md = new MarkdownIt({
-  html: false,
+  html: true,
   linkify: true,
   breaks: true,
   typographer: true
 })
 
-// Hàm render markdown
+// Enhanced markdown rendering function
 const renderMarkdown = (text: string) => {
   if (!text) return ''
-  // Ghép các dòng chỉ có số thứ tự với tất cả các dòng indent tiếp theo thành một dòng duy nhất
-  let fixed = text.replace(/^(\d+)\.\s*\n([ \t]+[^\n]+(?:\n[ \t]+[^\n]+)*)/gm, (match, num, content) => {
-    // Ghép tất cả các dòng indent thành một dòng, cách nhau bởi dấu cách
+  
+  let processedText = text
+  
+  // Fix numbered list formatting - join split numbered items
+  processedText = processedText.replace(/^(\d+)\.\s*\n([ \t]+[^\n]+(?:\n[ \t]+[^\n]+)*)/gm, (match, num, content) => {
     return num + '. ' + content.replace(/\n[ \t]+/g, ' ')
   })
-  // Xoá dòng trắng thừa giữa các mục danh sách
-  fixed = fixed.replace(/\n{2,}/g, '\n')
-  return md.render(fixed)
+  
+  // Convert bullet points to proper markdown format
+  processedText = processedText.replace(/^[-•]\s+/gm, '- ')
+  
+  // Ensure proper table formatting by checking for table-like structures
+  const lines = processedText.split('\n')
+  const processedLines = []
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    
+    // Detect potential table rows (lines with multiple | characters)
+    if (line.includes('|') && line.split('|').length >= 3) {
+      // This looks like a table row, ensure proper formatting
+      const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell.length > 0)
+      if (cells.length >= 2) {
+        processedLines.push('| ' + cells.join(' | ') + ' |')
+        
+        // Add separator row if this is the first row and next line isn't a separator
+        if (i === 0 || (i > 0 && !lines[i-1].includes('|'))) {
+          if (i + 1 < lines.length && !lines[i + 1].includes('---')) {
+            processedLines.push('| ' + cells.map(() => '---').join(' | ') + ' |')
+          }
+        }
+        continue
+      }
+    }
+    
+    processedLines.push(line)
+  }
+  
+  processedText = processedLines.join('\n')
+  
+  // Clean up excessive whitespace
+  processedText = processedText.replace(/\n{3,}/g, '\n\n')
+  
+  // Render with markdown-it
+  const rendered = md.render(processedText)
+  
+  // Post-process to add custom classes for better styling
+  return rendered
+    .replace(/<table>/g, '<table class="markdown-table">')
+    .replace(/<blockquote>/g, '<blockquote class="markdown-quote">')
+    .replace(/<code>/g, '<code class="markdown-code">')
+    .replace(/<pre>/g, '<pre class="markdown-pre">')
 }
 </script>
 
@@ -1653,19 +1399,21 @@ const renderMarkdown = (text: string) => {
 
 .chatbot-container-layout {
   display: flex;
-  height: calc(100vh - 84px); /* Full height minus header */
-  gap: 20px;
+  height: calc(100vh - 104px); /* Full height minus header and padding */
+  gap: 16px;
+  margin: 0 -20px; /* Compensate for main-content padding */
+  padding: 0 20px;
 }
 
 .conversation-history {
-  width: 300px;
+  width: 280px;
   flex-shrink: 0;
   background-color: #fff;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
   display: flex;
   flex-direction: column;
-  padding: 16px;
+  padding: 14px;
   opacity: 0;
   animation: fadeInDown 0.5s ease-out 0.2s forwards;
 }
@@ -1780,6 +1528,7 @@ const renderMarkdown = (text: string) => {
   position: relative;
   display: flex;
   flex-direction: column;
+  min-width: 0; /* Allow flex item to shrink */
 }
 
 .fade-in-down {
@@ -1795,10 +1544,10 @@ const renderMarkdown = (text: string) => {
 /* Header styles */
 .chat-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  margin-bottom: 30px;
-  padding-bottom: 20px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 
@@ -1817,6 +1566,7 @@ const renderMarkdown = (text: string) => {
   color: #666;
   font-size: 16px;
   margin: 0;
+  text-align: center;
 }
 
 .header-actions {
@@ -1859,6 +1609,7 @@ const renderMarkdown = (text: string) => {
   transition: all 0.3s ease;
   background: #fff;
   height: 100%; /* Ensure it takes full height */
+  width: 100%; /* Ensure it takes full width */
 }
 
 .chat-card:hover {
@@ -1918,7 +1669,7 @@ const renderMarkdown = (text: string) => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 0 20px 20px 20px;
+  padding: 0 16px 16px 16px;
   height: 100%; /* Ensure it takes full height */
   overflow: hidden; /* Prevent double scrollbars */
 }
@@ -1928,26 +1679,26 @@ const renderMarkdown = (text: string) => {
   flex: 1 1 auto;
   min-height: 0; /* allow flexbox scrolling */
   overflow-y: auto;
-  padding: 24px 8px 24px 24px;
+  padding: 20px 4px 20px 20px;
   /* background: #f5f7fa; -- removed per request */
   scroll-behavior: smooth;
   position: relative;
-  height: calc(100% - 100px); /* Ensure it takes full height minus input area */
-  max-height: calc(100vh - 300px); /* Maximum height to ensure visibility */
+  height: calc(100% - 80px); /* Ensure it takes full height minus input area */
+  max-height: calc(100vh - 270px); /* Maximum height to ensure visibility */
 }
 
 .messages-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding-bottom: 12px;
+  gap: 20px;
+  padding-bottom: 8px;
 }
 
 .message {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   display: flex;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
 }
 
 .message-avatar {
@@ -1985,8 +1736,8 @@ const renderMarkdown = (text: string) => {
 }
 
 .message-content {
-  max-width: 75%;
-  padding: 16px;
+  max-width: 80%;
+  padding: 14px 16px;
   border-radius: 18px;
   position: relative;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
@@ -2152,7 +1903,7 @@ const renderMarkdown = (text: string) => {
 .message-input-container {
   margin-top: auto;
   border-top: 1px solid #f0f0f0;
-  padding: 16px 0 0 0;
+  padding: 12px 0 0 0;
   background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
 }
 
@@ -2160,8 +1911,8 @@ const renderMarkdown = (text: string) => {
 .message-input {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .upload-btn {
@@ -2838,6 +2589,12 @@ const renderMarkdown = (text: string) => {
 }
 
 @media (max-width: 768px) {
+  .chatbot-container-layout {
+    margin: 0 -16px;
+    padding: 0 16px;
+    height: calc(100vh - 96px);
+  }
+  
   .chat-header {
     flex-direction: column;
     gap: 16px;
@@ -2854,10 +2611,6 @@ const renderMarkdown = (text: string) => {
   
   .el-col {
     width: 100% !important;
-  }
-  
-  .source-options {
-    flex-direction: column;
   }
 }
 
@@ -3216,11 +2969,12 @@ const renderMarkdown = (text: string) => {
   text-decoration: underline;
 }
 .message-text :deep(code) {
-  background: #f5f7fa;
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 90%;
-  color: #c7254e;
+  background: #f6f8fa;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #d73a49;
 }
 .message-text :deep(blockquote) {
   margin: 0.1em 0 0.1em 1.2em;
@@ -3241,5 +2995,137 @@ const renderMarkdown = (text: string) => {
 .message-text :deep(code) {
   padding: 1px 4px;
   font-size: 95%;
+}
+
+/* Enhanced table styling */
+.message-text :deep(.markdown-table),
+.message-text :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+  border: 1px solid #e1e8ed;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.message-text :deep(.markdown-table thead),
+.message-text :deep(table thead) {
+  background: linear-gradient(135deg, #409eff, #1989fa);
+  color: white;
+}
+
+.message-text :deep(.markdown-table th),
+.message-text :deep(table th) {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 2px solid #d0d7de;
+  background: linear-gradient(135deg, #409eff, #1989fa);
+  color: white;
+  font-size: 0.9em;
+}
+
+.message-text :deep(.markdown-table td),
+.message-text :deep(table td) {
+  padding: 10px 16px;
+  border-bottom: 1px solid #e1e8ed;
+  vertical-align: top;
+  font-size: 0.9em;
+}
+
+.message-text :deep(.markdown-table tbody tr:nth-child(even)),
+.message-text :deep(table tbody tr:nth-child(even)) {
+  background-color: #f8f9fa;
+}
+
+.message-text :deep(.markdown-table tbody tr:hover),
+.message-text :deep(table tbody tr:hover) {
+  background-color: #e8f4fd;
+  transition: background-color 0.2s ease;
+}
+
+.message-text :deep(.markdown-table tbody tr:last-child td),
+.message-text :deep(table tbody tr:last-child td) {
+  border-bottom: none;
+}
+
+/* Enhanced blockquote styling */
+.message-text :deep(.markdown-quote),
+.message-text :deep(blockquote) {
+  border-left: 4px solid #409eff;
+  background: linear-gradient(90deg, rgba(64, 158, 255, 0.05), transparent);
+  margin: 1em 0;
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  font-style: italic;
+  color: #555;
+}
+
+/* Enhanced code block styling */
+.message-text :deep(.markdown-pre),
+.message-text :deep(pre) {
+  background: #f6f8fa;
+  border: 1px solid #e1e8ed;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 1em 0;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.message-text :deep(.markdown-code),
+.message-text :deep(pre code) {
+  background: transparent;
+  padding: 0;
+  color: #333;
+  border-radius: 0;
+}
+
+/* Emoji styling */
+.message-text :deep(.emoji) {
+  font-size: 1.2em;
+  vertical-align: middle;
+}
+
+/* Mark/highlight styling */
+.message-text :deep(mark) {
+  background: linear-gradient(120deg, #a8e6cf 0%, #88d8a3 100%);
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: #2d3748;
+}
+
+/* Enhanced list styling */
+.message-text :deep(ol li),
+.message-text :deep(ul li) {
+  margin: 0.3em 0;
+  line-height: 1.6;
+}
+
+.message-text :deep(ol li::marker) {
+  color: #409eff;
+  font-weight: bold;
+}
+
+.message-text :deep(ul li::marker) {
+  color: #409eff;
+}
+
+/* Responsive table */
+@media (max-width: 768px) {
+  .message-text :deep(.markdown-table),
+  .message-text :deep(table) {
+    font-size: 0.8em;
+  }
+  
+  .message-text :deep(.markdown-table th),
+  .message-text :deep(.markdown-table td),
+  .message-text :deep(table th),
+  .message-text :deep(table td) {
+    padding: 8px 10px;
+  }
 }
 </style> 

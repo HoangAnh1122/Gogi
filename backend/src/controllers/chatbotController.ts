@@ -11,6 +11,7 @@ import ChatMessage from '../models/ChatMessage';
 import Conversation from '../models/Conversation';
 import User from '../models/User';
 import path from 'path';
+import fs from 'fs';
 import { DriveFile } from '../services/googleDriveService';
 
 // @desc    Get all conversations for a user
@@ -808,25 +809,39 @@ export const sendChatMessage = async (req: Request, res: Response) => {
           parts: msg.message || msg.response || ''
         }));
 
-        // Create enhanced prompt if images are present
-        let enhancedMessage = message;
+        // Build enhanced prompt and extract inline image data (max 3 images)
+        let enhancedMessage = message && message.trim().length > 0 ? message.trim() : '';
+
+        const inlineImages: Array<{ data: string; mimeType: string }> = [];
+
         if (imageIds && imageIds.length > 0) {
           const images = await Image.find({ _id: { $in: imageIds }, userId });
-          
-          enhancedMessage = `${message}\n\n[Context: User has uploaded ${imageIds.length} image${imageIds.length > 1 ? 's' : ''}. ` +
-            `You can describe what you see in these images and answer questions about them. ` +
-            `If the user wants to process these photos for a customer, they should say: "Process these photos for customer [name]" ` +
-            `or in Vietnamese: "Xử lý ảnh cho khách hàng [name]"]`;
-            
-          // Add image information to context
-          if (images.length > 0) {
-            const imageInfo = images.map(img => `Image: ${img.filename}, Status: ${img.status}`).join(', ');
-            enhancedMessage += `\n\nImage details: ${imageInfo}`;
+
+          // Default prompt if user did not send any text
+          if (!enhancedMessage) {
+            enhancedMessage = 'Hãy đưa ra nhận xét một cách chính xác, chuyên nghiệp về những bức ảnh mà tôi vừa tải lên. Vui lòng mô tả chủ thể, bối cảnh, ánh sáng, bố cục và cảm xúc.';
+          }
+
+          // Append context for the AI
+          enhancedMessage += `\n\n[Context: Người dùng đã tải lên ${images.length} ảnh. ` +
+            `Bạn cần mô tả nội dung, đánh giá chất lượng và gợi ý cải thiện (nếu có) bằng giọng văn chuyên nghiệp. ` +
+            `Nếu người dùng muốn xử lý ảnh cho khách hàng, hãy chờ lệnh: \"Process these photos for customer [name]\" hoặc \"Xử lý ảnh cho khách hàng [name]\".]`;
+
+          // Prepare up to 3 images as inline base64 for Gemini vision model
+          for (const img of images.slice(0, 3)) {
+            try {
+              // Resolve absolute path (image.path is relative to project root)
+              const imgPath = path.isAbsolute(img.path) ? img.path : path.join(process.cwd(), img.path);
+              const data = fs.readFileSync(imgPath, { encoding: 'base64' });
+              inlineImages.push({ data, mimeType: img.mimeType || 'image/jpeg' });
+            } catch (readErr: any) {
+              console.warn('⚠️  Unable to read image for AI prompt:', img.filename, readErr?.message || readErr);
+            }
           }
         }
 
         console.log('Calling googleAiService.generateChatResponse...');
-        aiResponse = await googleAiService.generateChatResponse(enhancedMessage, formattedHistory);
+        aiResponse = await googleAiService.generateChatResponse(enhancedMessage, formattedHistory, inlineImages.length ? inlineImages : undefined);
         console.log('AI Response generated successfully:', aiResponse.substring(0, 100) + '...');
       } catch (aiError: any) {
         console.error('AI generation error:', aiError);
