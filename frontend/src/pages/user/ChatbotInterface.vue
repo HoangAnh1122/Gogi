@@ -1301,12 +1301,27 @@ const renderMarkdown = (text: string) => {
   // Convert bullet points to proper markdown format
   processedText = processedText.replace(/^[-•]\s+/gm, '- ')
   
+  // Balanced line break handling
+  processedText = processedText.replace(/\n{4,}/g, '\n\n\n')
+  
   // Ensure proper table formatting by checking for table-like structures
   const lines = processedText.split('\n')
   const processedLines = []
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim()
+    
+    // Handle empty lines more gracefully
+    if (line === '') {
+      const prevLine = i > 0 ? lines[i-1].trim() : ''
+      const nextLine = i < lines.length - 1 ? lines[i+1].trim() : ''
+      
+      if (prevLine && nextLine) {
+        // Keep empty lines between different sections
+        processedLines.push('')
+      }
+      continue
+    }
     
     // Detect potential table rows (lines with multiple | characters)
     if (line.includes('|') && line.split('|').length >= 3) {
@@ -1330,13 +1345,15 @@ const renderMarkdown = (text: string) => {
   
   processedText = processedLines.join('\n')
   
-  // Clean up excessive whitespace
-  processedText = processedText.replace(/\n{3,}/g, '\n\n')
+  // Balanced cleanup - maintain readability
+  processedText = processedText.replace(/\n{4,}/g, '\n\n\n')
+  processedText = processedText.replace(/^\n+/, '') // Remove leading newlines
+  processedText = processedText.replace(/\n+$/, '') // Remove trailing newlines
   
   // Render with markdown-it
   const rendered = md.render(processedText)
   
-  // Post-process to add custom classes for better styling
+  // Post-process to add custom classes
   return rendered
     .replace(/<table>/g, '<table class="markdown-table">')
     .replace(/<blockquote>/g, '<blockquote class="markdown-quote">')
@@ -2997,16 +3014,17 @@ const renderMarkdown = (text: string) => {
   font-size: 95%;
 }
 
-/* Enhanced table styling */
+/* Enhanced table styling - Compact and beautiful */
 .message-text :deep(.markdown-table),
 .message-text :deep(table) {
   border-collapse: collapse;
   width: 100%;
-  margin: 1em 0;
+  margin: 0.5em 0;
   border: 1px solid #e1e8ed;
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  font-size: 0.9em;
 }
 
 .message-text :deep(.markdown-table thead),
@@ -3017,21 +3035,23 @@ const renderMarkdown = (text: string) => {
 
 .message-text :deep(.markdown-table th),
 .message-text :deep(table th) {
-  padding: 12px 16px;
+  padding: 10px 12px;
   text-align: left;
   font-weight: 600;
-  border-bottom: 2px solid #d0d7de;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   background: linear-gradient(135deg, #409eff, #1989fa);
   color: white;
-  font-size: 0.9em;
+  font-size: 0.85em;
+  white-space: nowrap;
 }
 
 .message-text :deep(.markdown-table td),
 .message-text :deep(table td) {
-  padding: 10px 16px;
-  border-bottom: 1px solid #e1e8ed;
-  vertical-align: top;
-  font-size: 0.9em;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+  font-size: 0.85em;
+  line-height: 1.4;
 }
 
 .message-text :deep(.markdown-table tbody tr:nth-child(even)),
@@ -3114,18 +3134,48 @@ const renderMarkdown = (text: string) => {
   color: #409eff;
 }
 
+/* Balanced spacing for sections */
+.message-text :deep(h1),
+.message-text :deep(h2),
+.message-text :deep(h3),
+.message-text :deep(h4) {
+  margin: 0.6em 0 0.3em 0;
+  line-height: 1.4;
+}
+
+.message-text :deep(p) {
+  margin: 0.4em 0;
+  line-height: 1.5;
+}
+
+.message-text :deep(ul),
+.message-text :deep(ol) {
+  margin: 0.3em 0;
+  padding-left: 1.2em;
+}
+
+.message-text :deep(li) {
+  margin: 0.2em 0;
+  line-height: 1.4;
+}
+
+.message-text :deep(strong) {
+  line-height: 1.4;
+  display: inline;
+}
+
 /* Responsive table */
 @media (max-width: 768px) {
   .message-text :deep(.markdown-table),
   .message-text :deep(table) {
-    font-size: 0.8em;
+    font-size: 0.75em;
   }
   
   .message-text :deep(.markdown-table th),
   .message-text :deep(.markdown-table td),
   .message-text :deep(table th),
   .message-text :deep(table td) {
-    padding: 8px 10px;
+    padding: 6px 8px;
   }
 }
 </style> 
