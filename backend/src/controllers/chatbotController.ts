@@ -1291,40 +1291,48 @@ async function getAllImagesFromFolder(folderPath: string): Promise<DriveFile[]> 
 /**
  * Create processed folder in Google Drive for matched faces
  */
-async function createProcessedFolder(selectedImages: any[], customerName: string): Promise<string> {
+async function createProcessedFolder(selectedImages: any[], customerName: string): Promise<{ publicLink: string; customerFolderId: string; bestFolderId: string }> {
   try {
     // Get admin user to access their Drive config
     const adminUser = await User.findOne({ role: 'admin' });
     if (!adminUser) {
       console.log('[createProcessedFolder] Admin user not found');
-      return '';
+      return { publicLink: '', customerFolderId: '', bestFolderId: '' };
     }
 
     // Get Drive configuration from admin
     const driveConfig = await DriveConfig.findOne({ userId: adminUser._id });
     if (!driveConfig || !driveConfig.refreshToken) {
       console.log('[createProcessedFolder] Google Drive not configured for admin');
-      return '';
+      return { publicLink: '', customerFolderId: '', bestFolderId: '' };
     }
 
-    // Create main Gogi folder at root level
+    // Create main Gogi folder at root level (sử dụng tên consistent với executePhotoWorkflow)
     const gogiFolder = await googleDriveService.findOrCreateFolder(
       driveConfig, 
-      'Gogi-folder',
+      'Gogi-Processed', // Đổi thành tên consistent
       'root' // Create at root level
     );
     
     // Create customer folder with timestamp
-    const customerFolderName = `${customerName}-${Date.now()}`;
+    const customerFolderName = `${customerName} - ${new Date().toISOString().split('T')[0]}`;
     const customerFolder = await googleDriveService.createFolder(
       driveConfig, 
       customerFolderName, 
       gogiFolder.id
     );
     
+    // ✅ TẠO BEST SUBFOLDER (THÊM LOGIC MỚI)
+    const bestFolder = await googleDriveService.createFolder(
+      driveConfig, 
+      'Best', 
+      customerFolder.id
+    );
+    
     console.log(`[createProcessedFolder] Created folder structure:`);
-    console.log(`  - Root/Gogi-folder (ID: ${gogiFolder.id})`);
+    console.log(`  - Root/Gogi-Processed (ID: ${gogiFolder.id})`);
     console.log(`  - Customer folder: ${customerFolderName} (ID: ${customerFolder.id})`);
+    console.log(`  - Best folder (ID: ${bestFolder.id})`);
     
     // Set public permission for customer folder
     const publicLink = await googleDriveService.setPublicPermission(
@@ -1332,10 +1340,14 @@ async function createProcessedFolder(selectedImages: any[], customerName: string
       customerFolder.id
     );
     
-    return publicLink || `https://drive.google.com/drive/folders/${customerFolder.id}`;
+    return { 
+      publicLink: publicLink || `https://drive.google.com/drive/folders/${customerFolder.id}`,
+      customerFolderId: customerFolder.id,
+      bestFolderId: bestFolder.id
+    };
   } catch (error) {
     console.error('[createProcessedFolder] Error:', error);
-    return '';
+    return { publicLink: '', customerFolderId: '', bestFolderId: '' };
   }
 }
 
@@ -1601,15 +1613,12 @@ async function executePhotoWorkflow(
               };
             }
 
-            // Create output folder
-            const outputFolderUrl = await createProcessedFolder(selectedImages, customerName);
+            // Create output folder with Best subfolder
+            const folderResult = await createProcessedFolder(selectedImages, customerName);
+            const { publicLink: outputFolderUrl, customerFolderId, bestFolderId } = folderResult;
             
-            // Get the folder ID from the URL
-            const folderIdMatch = outputFolderUrl.match(/folders\/([^\/]+)/);
-            const customerFolderId = folderIdMatch ? folderIdMatch[1] : '';
-            
-            if (customerFolderId) {
-              // Copy matched images to the customer folder
+            if (customerFolderId && outputFolderUrl) {
+              // Copy ALL matched images to the customer folder
               console.log(`Copying ${selectedImages.length} matched images to customer folder...`);
               
               for (const image of selectedImages) {
@@ -1629,11 +1638,41 @@ async function executePhotoWorkflow(
                   console.error(`❌ Error copying image:`, error);
                 }
               }
+              
+              // ✅ COPY BEST IMAGES TO BEST FOLDER (THÊM LOGIC MỚI)
+              if (bestFolderId && selectedImages.length > 0) {
+                // Sắp xếp theo combined score và chọn top images cho Best folder
+                const sortedImages = [...selectedImages].sort((a, b) => (b.combinedScore || 0) - (a.combinedScore || 0));
+                const bestImages = sortedImages.slice(0, Math.min(10, selectedImages.length)); // Top 10 hoặc ít hơn
+                
+                console.log(`Copying ${bestImages.length} best images to Best folder...`);
+                
+                for (const image of bestImages) {
+                  try {
+                    const fileId = (image as any).driveFileId;
+                    if (fileId) {
+                      await googleDriveService.copyFile(
+                        driveConfig,
+                        fileId,
+                        bestFolderId
+                      );
+                      console.log(`✅ Copied best image ${fileId} to Best folder`);
+                    }
+                  } catch (error) {
+                    console.error(`❌ Error copying best image:`, error);
+                  }
+                }
+              }
             }
             
             console.log(`✅ Enhanced face matching completed successfully!`);
             console.log(`📁 Output folder: ${outputFolderUrl}`);
             console.log(`🎯 Best matches: ${selectedImages.map(img => path.basename(img.imagePath)).join(', ')}`);
+
+            // Tính toán số lượng best photos chính xác
+            const bestPhotosCount = bestFolderId && selectedImages.length > 0 
+              ? Math.min(10, selectedImages.length) 
+              : 0;
 
             return {
               success: true,
@@ -1641,14 +1680,20 @@ async function executePhotoWorkflow(
               folderUrl: outputFolderUrl,
               totalImages: folderImages.length,
               matchingPhotos: selectedImages.length,
-              bestPhotosCount: selectedImages.length,
+              bestPhotosCount: bestPhotosCount,
               folderName: customerName,
               publicLink: outputFolderUrl,
+              folderStructure: {
+                gogiFolder: 'Gogi-Processed',
+                customerFolder: customerName,
+                bestFolder: 'Best'
+              },
               matchingInfo: {
                 totalMatches: matches.length,
                 qualityMatches: processedMatches.length,
                 customerFaceQuality: customerFaceEmbedding.qualityScore,
-                selectedImages: selectedImages.length
+                selectedImages: selectedImages.length,
+                bestImagesInBestFolder: bestPhotosCount
               }
             };
 
