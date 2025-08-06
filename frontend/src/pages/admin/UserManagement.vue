@@ -199,11 +199,12 @@
       
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="showCreateDialog = false">Cancel</el-button>
+          <el-button @click="() => { showCreateDialog = false; resetForm(); }">Cancel</el-button>
           <el-button 
             type="primary" 
             @click="handleSaveUser"
             class="pulse-on-hover"
+            :loading="loading"
           >
             {{ editingUser ? 'Update' : 'Create' }}
           </el-button>
@@ -248,7 +249,11 @@ const userRules: FormRules = {
     { type: 'email', message: 'Please enter a valid email', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: 'Please enter password', trigger: 'blur' },
+    { 
+      required: () => !editingUser.value || showPasswordField.value, 
+      message: 'Please enter password', 
+      trigger: 'blur' 
+    },
     { min: 6, message: 'Password must be at least 6 characters', trigger: 'blur' }
   ],
   role: [
@@ -301,8 +306,18 @@ const loadUsers = async () => {
   loading.value = true
   try {
     const response = await userApi.getUsers(currentPage.value, pageSize.value)
-    users.value = response.data
+    // Handle nested response structure: response contains { data: users[], total, page, etc. }
+    const rawUsers = Array.isArray(response.data) ? response.data : response.data?.data || []
+    
+    // Transform _id to id for frontend consistency
+    users.value = rawUsers.map((user: any) => ({
+      ...user,
+      id: user._id // Map MongoDB _id to frontend id
+    }))
+    
+    console.log('Loaded users:', users.value.length)
   } catch (error: any) {
+    console.error('Load users error:', error)
     ElMessage({
       message: `Failed to load users: ${error.message || 'Unknown error'}`,
       type: 'error',
@@ -310,7 +325,7 @@ const loadUsers = async () => {
     })
     users.value = []
   } finally {
-      loading.value = false
+    loading.value = false
   }
 }
 
@@ -387,9 +402,9 @@ const handleSaveUser = async () => {
 
 const saveUserToDatabase = async () => {
   try {
-    loading.value = true; // Add loading state
+    loading.value = true;
     
-      if (editingUser.value) {
+    if (editingUser.value) {
       const updateData: Partial<User> = {
         username: userForm.username,
         email: userForm.email,
@@ -401,50 +416,63 @@ const saveUserToDatabase = async () => {
         updateData.password = userForm.password;
       }
       
-      await userApi.updateUser(editingUser.value.id, updateData)
-        ElMessage({
-          message: 'User updated successfully',
-          type: 'success',
-          duration: 3000
-        })
-      } else {
-      await userApi.createUser({
+      const response = await userApi.updateUser(editingUser.value.id, updateData)
+      console.log('Update user response:', response)
+      
+      ElMessage({
+        message: 'User updated successfully',
+        type: 'success',
+        duration: 3000
+      })
+    } else {
+      const response = await userApi.createUser({
         username: userForm.username,
         email: userForm.email,
         role: userForm.role,
         password: userForm.password
       })
-        ElMessage({
-          message: 'User created successfully',
-          type: 'success',
-          duration: 3000
-        })
-      }
+      console.log('Create user response:', response)
       
-      showCreateDialog.value = false
-      resetForm()
-      loadUsers()
-    } catch (error: any) {
-    let errorMessage = error.message || 'Operation failed';
-    // Try to extract more specific error messages from backend
-    if (error.message && error.message.includes('User already exists')) {
-      errorMessage = 'A user with this username or email already exists';
+      ElMessage({
+        message: 'User created successfully',
+        type: 'success',
+        duration: 3000
+      })
     }
     
-      ElMessage({
+    showCreateDialog.value = false
+    resetForm()
+    await loadUsers() // Wait for users to reload
+  } catch (error: any) {
+    console.error('Save user error:', error)
+    
+    let errorMessage = error.message || 'Operation failed';
+    
+    // Extract more specific error messages
+    if (error.message) {
+      if (error.message.includes('already exists') || error.message.includes('duplicate')) {
+        errorMessage = 'A user with this username or email already exists';
+      } else if (error.message.includes('validation')) {
+        errorMessage = 'Please check all required fields';
+      } else if (error.message.includes('password')) {
+        errorMessage = 'Password does not meet requirements';
+      }
+    }
+    
+    ElMessage({
       message: errorMessage,
-        type: 'error',
-        duration: 5000
-      })
+      type: 'error',
+      duration: 5000
+    })
   } finally {
     loading.value = false;
-    }
+  }
 }
 
 const deleteUser = async (userId: string) => {
   try {
     await ElMessageBox.confirm(
-      'Are you sure you want to delete this user?', 
+      'Are you sure you want to delete this user? This action cannot be undone.', 
       'Confirm Delete',
       {
         confirmButtonText: 'Delete',
@@ -454,37 +482,49 @@ const deleteUser = async (userId: string) => {
     )
     
     try {
-    await userApi.deleteUser(userId)
-    ElMessage({
-      message: 'User deleted successfully',
-      type: 'success',
-      duration: 3000
-    })
-    loadUsers()
-  } catch (error: any) {
+      loading.value = true;
+      await userApi.deleteUser(userId)
+      
+      ElMessage({
+        message: 'User deleted successfully',
+        type: 'success',
+        duration: 3000
+      })
+      
+      await loadUsers() // Reload users after deletion
+    } catch (error: any) {
+      console.error('Delete user error:', error)
       ElMessage({
         message: `Delete failed: ${error.message || 'Unknown error'}`,
         type: 'error',
         duration: 5000
       })
+    } finally {
+      loading.value = false;
     }
   } catch (error) {
     // User canceled the operation
+    console.log('User canceled delete operation')
   }
 }
 
 const resetForm = () => {
   editingUser.value = null
-  if (userFormRef.value) {
-    userFormRef.value.resetFields()
-  }
+  showPasswordField.value = false
+  
+  // Reset form fields
   Object.assign(userForm, {
     username: '',
     email: '',
     role: 'user',
     password: ''
   })
-  showPasswordField.value = false
+  
+  // Clear form validation
+  if (userFormRef.value) {
+    userFormRef.value.resetFields()
+    userFormRef.value.clearValidate()
+  }
 }
 
 onMounted(() => {
